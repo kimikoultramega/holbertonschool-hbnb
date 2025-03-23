@@ -40,53 +40,76 @@ hbnb/
 ├── config.py                     # Configuración global (por ejemplo, SECRET_KEY, DEBUG, etc.)
 ├── requirements.txt              # Lista de dependencias (Flask, flask-restx, etc.)
 └── README.md                     # Este documento
+
+
 Características Principales
+
 Endpoints de Usuario (User):
 
 POST /api/v1/users/: Crea un nuevo usuario, verificando que el email no esté registrado.
+
 GET /api/v1/users/<user_id>: Recupera los detalles de un usuario por su ID.
+
 GET /api/v1/users/: Lista todos los usuarios registrados.
+
 PUT /api/v1/users/<user_id>: Actualiza la información de un usuario existente.
+
+Endpoints de Amenidad (Amenity)
+
+POST /api/v1/amenities/: Registra una nueva amenidad.
+
+GET /api/v1/amenities/: Recupera una lista de todas las amenidades.
+
+GET /api/v1/amenities/<amenity_id>: Recupera los detalles de una amenidad específica por su ID.
+
+PUT /api/v1/amenities/<amenity_id>: Actualiza la información de una amenidad existente.
+
 Patrón Facade:
+
 La clase HBnBFacade en app/services/facade.py centraliza la lógica de negocio y la comunicación con el repositorio, facilitando la integración entre la capa de presentación y la persistencia.
 
 Persistencia en Memoria:
+
 Se implementa un repositorio en memoria en app/persistence/repository.py que simula el almacenamiento de datos, y que se podrá reemplazar en futuras partes del proyecto por una solución basada en bases de datos (por ejemplo, con SQLAlchemy).
 
 Validación de Datos:
+
 Se utilizan modelos y validaciones a nivel de API (con Flask-RESTx) y en los modelos (por ejemplo, en el constructor de User) para asegurar que los datos cumplan los requisitos.
 
 Cómo Ejecutar la Aplicación
+
 Clonar o descargar el proyecto:
+
 Asegúrate de tener el proyecto en tu máquina.
 
 Instalar las dependencias:
+
 En el directorio raíz del proyecto (donde se encuentra requirements.txt), ejecuta:
 
-bash
-Copiar
 pip install -r requirements.txt
+
 Esto instalará Flask, flask-restx y cualquier otra dependencia necesaria.
 
 Ejecutar la aplicación:
 Desde la raíz del proyecto, ejecuta:
 
-bash
-Copiar
 python run.py
 Flask se iniciará en el puerto 5000 por defecto, y deberías ver un mensaje similar a:
 
-csharp
-Copiar
 * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+
 Probar los Endpoints:
 Puedes usar Postman, cURL o tu navegador para hacer peticiones. Por ejemplo, para crear un usuario:
 
-bash
-Copiar
+
 curl -X POST http://localhost:5000/api/v1/users/ \
   -H "Content-Type: application/json" \
   -d '{"first_name": "John", "last_name": "Doe", "email": "john.doe@example.com"}'
+
+curl -X POST http://localhost:5000/api/v1/amenities/ \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Wi-Fi"}'
+
 Notas Adicionales
 Evolución del Proyecto:
 Esta parte se enfoca en la gestión de usuarios, pero la misma estructura se extenderá a otras entidades como Place, Review y Amenity.
