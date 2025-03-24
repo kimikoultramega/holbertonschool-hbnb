@@ -23,7 +23,7 @@ class HBnBFacade:
             raise ValueError("User not found")
         
         # Verificamos que el place exista:
-        place = self.place_repo.get(review_data['palce_id'])
+        place = self.place_repo.get(review_data['place_id'])
         if not place:
             raise ValueError("Place not found")
         

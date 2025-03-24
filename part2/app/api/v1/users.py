@@ -29,9 +29,15 @@ class UserList(Resource):
         if existing_user:
             return {'error': 'Email ya registrado'}, 400
         
-        # Creamos el usuario utilizando la capa de servicios.
-        new_user = facade.create_user(user_data)
-        # Retornamos los datos del usuario creado
+        try:
+            # Creamos el usuario utilizando la capa de servicios.
+            new_user = facade.create_user(user_data)
+            
+        except ValueError as e:
+
+            # Capturamos el ValueError lanzado por la validación del modelo
+            return {'error': str(e)}, 400
+
         return {
             'id': new_user.id,
             'first_name': new_user.first_name,

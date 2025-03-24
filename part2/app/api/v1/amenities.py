@@ -23,9 +23,14 @@ class AmenityList(Resource):
 
         amenity_data = api.payload
 
-        # Se llama al método create_amenity de la fachada para crear la amenidad.
-        new_amenity = facade.create_amenity(amenity_data)
+        try:
+            # Se llama al método create_amenity de la fachada para crear la amenidad.
+            new_amenity = facade.create_amenity(amenity_data)
 
+        except ValueError as e:
+            # Captura el error de validación y retorna un 400
+            return {'error': str(e)}, 400
+        
         # Se retorna la info de la amenity creada y el código 201
 
         return  {'id': new_amenity.id, 'name': new_amenity.name}, 201
