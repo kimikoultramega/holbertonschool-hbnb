@@ -1,12 +1,19 @@
 from flask_restx import Namespace, Resource, fields
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services import facade
 
-api = Namespace('users', description='Operaciones relacionadas con usuarios')
+api = Namespace('users', description='User operations')
+
+update_user_model = api.model('UpdateUser', {
+    'first_name': fields.String(required=True, description='Nombre del usuario'),
+    'last_name': fields.String(required=True, description='Apellido del usuario')
+})
 
 user_model = api.model('User', {
     'first_name': fields.String(required=True, description='Nombre del usuario'),
     'last_name': fields.String(required=True, description='Apellido del usuario'),
-    'email': fields.String(required=True, description='Email del usuario')
+    'email': fields.String(required=True, description='Email del usuario'),
+    'password': fields.String(required=True, description='Password for the user')
 })
 
 # Endpoint para manejar la creación de usuarios y la lista de usuarios
@@ -86,22 +93,33 @@ class UserResource(Resource):
             'email': user.email
         }, 200
     
-    @api.expect(user_model, validate=True)
+    @jwt_required()
+    @api.expect(update_user_model, validate=True)
     @api.response(200, 'Usuario actualizado con éxito')
+    @api.response(403, 'Unauthorized action')
     @api.response(404, 'Usuario no encontrado')
     def put(self, user_id):
         """
         Actualiza la información de un usuario existente
+        Solo el propio usuario puede modificar sus datos; no se permite cambiar email ni password.
         """
-        user = facade.get_user(user_id)
-        if not user:
-            return {'error': 'Usuario no encontrado'}, 404
+        current_user = get_jwt_identity()
+        print("User ID en URL:", user_id)
+        print("User ID en Token:", current_user['id'])
 
+        if current_user['id'] != user_id:
+            return {'error': 'Unauthorized action'}, 403
+    
         # Obtenemos los nuevos datos
 
         user_data = api.payload
 
-        # Actualizamos el usuario utilizando el método update del modelo (heredado de BaseModel)
+        # if 'email' in update_data or 'password' in update_data:
+            # return {'error': 'You cannot modify email or password'}, 400
+        
+        user = facade.get_user(user_id)
+        if not user:
+            return {'error': 'Usuario no encontrado'}, 404
 
         user.update(user_data)
 

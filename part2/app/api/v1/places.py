@@ -1,4 +1,5 @@
 from flask_restx import Namespace, Resource, fields
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services import facade
 
 # Creamos un namespace para agrupar los endpoints relacionados con places.
@@ -34,22 +35,25 @@ place_model = api.model('Place', {
     'price': fields.Float(required=True, description='Price per night'),
     'latitude': fields.Float(required=True, description='Latitude of the place'),
     'longitude': fields.Float(required=True, description='Longitude of the place'),
-    'owner_id': fields.String(required=True, description='ID of the owner'),
+    'owner_id': fields.String(required=False, description='ID of the owner'),
     'amenities': fields.List(fields.String, description="List of amenity IDs"),
     'reviews': fields.List(fields.Nested(review_model), description='List of reviews')
 })
 
 @api.route('/')
 class PlaceList(Resource):
+    @jwt_required() # Solo usuarios autenticados pueden crear places
     @api.expect(place_model, validate=True)
     @api.response(201, 'Place successfully created')
     @api.response(400, 'Invalid input data')
     def post(self):
         """
         POST /api/v1/places/
-        Registra un nuevo place.
+        Registra un nuevo place. Se fuerza que el owner_id sea el del usuario autenticado.
         """
+        current_user = get_jwt_identity()
         place_data = api.payload  # Extraemos el payload (datos enviados en la solicitud)
+        place_data['owner_id'] = current_user['id']
         try:
             new_place = facade.create_place(place_data)
 
@@ -116,12 +120,16 @@ class PlaceResource(Resource):
                 'last_name': place.owner.last_name,
                 'email': place.owner.email
             },
-            'amenities': [{'id': amenity.id, 'name': amenity.name} for amenity in place.amenities]
+            'amenities': [{'id': amenity.id, 'name': amenity.name} for amenity in place.amenities],
+            'reviews': [{'id': review.id, 'text': review.text, 'rating': review.rating} for review in place.reviews]
         }
         return response, 200
 
+
+    @jwt_required() # Solo el propietario puede actualizar
     @api.expect(place_model, validate=True)
     @api.response(200, 'Place updated successfully')
+    @api.response(403, 'Unauthorized action')
     @api.response(404, 'Place not found')
     @api.response(400, 'Invalid input data')
     def put(self, place_id):
@@ -130,11 +138,32 @@ class PlaceResource(Resource):
         Actualiza la información de un place existente.
         Se permite actualizar atributos como title, description, price, latitude y longitude.
         """
-        place_data = api.payload
-        updated_place = facade.update_place(place_id, place_data)
-        if not updated_place:
+        current_user = get_jwt_identity()
+
+        print("Place ID recibido para actualizar:", place_id)
+
+        place = facade.get_place(place_id)
+
+        print("Resultado de facade.get_place:", place)
+        
+        if not place:
             return {'error': 'Place not found'}, 404
-        # Retornamos los datos actualizados 
+        
+        # Validar que el usuario autenticado es el propietario
+        
+        if str(place.owner.id) != current_user['id']:
+            return {'error': 'Unauthorized action'}, 403
+        
+        place_data = api.payload
+        # Forzar que el owner_id sea el del usuario autenticado
+        place_data['owner_id'] = current_user['id']
+
+        try:
+            updated_place = facade.update_place(place_id, place_data)
+
+        except ValueError as e:
+            return {'error': str(e)}, 400
+
         return {
             'id': updated_place.id,
             'title': updated_place.title,

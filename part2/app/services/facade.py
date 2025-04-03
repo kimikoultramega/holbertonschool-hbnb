@@ -207,7 +207,8 @@ class HBnBFacade:
         return self.user_repo.get_by_attribute('email', email)
     
     
-    # Método placeholder para obtener un lugar (Place) por su ID
     def get_place(self, place_id):
-        # La lógica se implementará en tareas posteriores
-        pass
+        """
+        Recupera un Place por su ID.
+        """
+        return self.place_repo.get(place_id)

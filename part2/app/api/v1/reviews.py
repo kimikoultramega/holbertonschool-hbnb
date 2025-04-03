@@ -1,5 +1,6 @@
 from flask_restx import Namespace, Resource, fields
 from app.services import facade
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Creamos un namespace para las operaciones relacionadas con reviews.
 api = Namespace('reviews', description='Review operations')
@@ -8,12 +9,13 @@ api = Namespace('reviews', description='Review operations')
 review_model = api.model('Review', {
     'text': fields.String(required=True, description='Text of the review'),
     'rating': fields.Integer(required=True, description='Rating of the place (1-5)'),
-    'user_id': fields.String(required=True, description='ID of the user'),
+    'user_id': fields.String(required=False, description='ID of the user'),
     'place_id': fields.String(required=True, description='ID of the place')
 })
 
 @api.route('/')
 class ReviewList(Resource):
+    @jwt_required()
     @api.expect(review_model, validate=True)
     @api.response(201, 'Review successfully created')
     @api.response(400, 'Invalid input data')
@@ -23,7 +25,26 @@ class ReviewList(Resource):
         Registra una nueva review.
         Se valida que user_id y place_id existan y que la calificación esté en el rango correcto.
         """
+        current_user = get_jwt_identity()
         review_data = api.payload  # Extraemos los datos enviados en la solicitud
+        review_data['user_id'] = current_user['id']
+
+        # Validamos que el place exista y no pertenezca al usuario.
+        place = facade.get_place(review_data['place_id'])
+
+        if not place:
+            return {'error': 'Place not found'}, 404
+        
+        if str(place.owner.id) == current_user['id']:
+            return {'error': 'You cannot review your own place'}, 400
+        
+        # Verificar que el usuario no haya evaluado previamente el mismo place.
+
+        existing_reviews = facade.get_reviews_by_place(review_data['place_id'])
+        for review in existing_reviews:
+            if str(review.user.id) == current_user['id']:
+                return {'error': 'You have already reviewed this place'}, 400
+
         try:
             new_review = facade.create_review(review_data)
         except ValueError as e:
@@ -75,19 +96,35 @@ class ReviewResource(Resource):
             'place_id': review.place.id
         }, 200
 
+    @jwt_required()
     @api.expect(review_model, validate=True)
     @api.response(200, 'Review updated successfully')
     @api.response(404, 'Review not found')
-    @api.response(400, 'Invalid input data')
+    @api.response(403, 'Unauthorized action')
     def put(self, review_id):
         """
         PUT /api/v1/reviews/<review_id>
         Actualiza la información de una review existente.
         """
+
+        current_user = get_jwt_identity()
+        review = facade.get_review(review_id)
+        if not review:
+            return {'error': 'Review not found'}, 404
+        if str(review.user.id) != current_user['id']:
+            return {'error': 'Unauthorized action'}, 403
+
         review_data = api.payload
-        updated_review = facade.update_review(review_id, review_data)
-        if not updated_review:
-            return {'error': 'Review not found or invalid input'}, 404
+
+        # Forzar que el user_id permanezca como el usuario autenticado.
+        review_data['user_id'] = current_user['id']
+
+        try:
+            updated_review = facade.update_review(review_id, review_data)
+        
+        except ValueError as e:
+            return {'error': str(e)}, 400
+        
         return {
             'id': updated_review.id,
             'text': updated_review.text,
@@ -96,13 +133,23 @@ class ReviewResource(Resource):
             'place_id': updated_review.place.id
         }, 200
 
+    @jwt_required()
     @api.response(200, 'Review deleted successfully')
+    @api.response(403, 'Unauthorized action')
     @api.response(404, 'Review not found')
     def delete(self, review_id):
         """
         DELETE /api/v1/reviews/<review_id>
         Elimina una review.
         """
+        current_user = get_jwt_identity()
+        review = facade.get_review(review_id)
+
+        if not review:
+            return {'error': 'Review not found'}, 404
+        if str(review.user.id) != current_user['id']:
+            return {'error': 'Review not found'}, 403
+        
         result = facade.delete_review(review_id)
         if not result:
             return {'error': 'Review not found'}, 404
